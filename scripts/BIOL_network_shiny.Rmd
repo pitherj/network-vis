@@ -1,0 +1,242 @@
+---
+title: "Interactive network visualization"
+author: "Jason Pither"
+date: "26/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This page was last updated on `r format(Sys.time(), '%B %d, %Y')`.
+
+## Background
+
+This script is exploring how to set up interactive network visualizations for our open educational resources grant activities.
+
+The general workflow is:  
+
++ Save all course files in markdown format (".md")
++ Save all files for a given course in a directory named for that course (e.g. "BIOL116")
++ the script will scan each markdown file for keywords denoted by hashtags and wrangle into proper format
+
+## Resources used
+
+I'm following tutorial information from this website:
+
+<https://datastorm-open.github.io/visNetwork/>
+
+    install.packages("visNetwork", dependencies = T)
+    install.packages("igraph", dependencies = T)
+
+## Setup
+
+### Load libraries
+
+```{r cars, message = F}
+library(visNetwork)
+library(tidyverse)
+library(igraph)
+library(xfun)
+library(RColorBrewer)
+library(here)
+```
+
+### Directory paths
+
+Using the `here` package ensures that the root directory is the project directory, and simplifies path files.
+
+## Gather data
+
+First we need to find the files and scan them for the keyword data.  
+
+In the chunk below we first create a vector holding all sub-directory (course) names, and remove the first element provided because that is the root directory name.
+
+We then cycle through directories and make a list of all files contained therein, appending lists from all directories.
+
+Create dataframe
+```{r get_file_info}
+# create data frame to hold file info from each directory
+file.info <- tibble(
+  course.dir = rep(list.dirs(here("courses"))[-1], c(sapply(list.dirs(here("courses"))[-1], function(x){
+    length(list.files(here(x)))}))),
+  filename = unlist(sapply(list.dirs(here("courses"))[-1], function(x){list.files(here(x))}))
+                        )
+```
+
+Have a look at info:
+```{r view_file_info}
+head(file.info)
+```
+
+Now we'll go through each markdown file and tally keywords. 
+
+We'll create a list that holds the info, and each list element is a course document.
+
+Useful guidance at stackoverflow [here](https://stackoverflow.com/questions/55194830/how-to-extract-hashtags-with-gsub).
+
+```{r scan_files}
+hashtag.list <- list()
+for (i in 1:nrow(file.info)) {
+  # first extract all the text from the file and put into single string
+  # the `file_string` function from the `xfun` package does this
+  temp.text <- xfun::file_string(paste(file.info[i,1], file.info[i, 2], sep = "/"))
+  # now search for hashtagged words, and place them into list element
+  hashtag.list[[i]] <- unlist(regmatches(temp.text, gregexpr('#[A-Za-z][A-Za-z]*/[A-Za-z][A-Za-z_-]*', temp.text)))
+  rm(temp.text)
+}
+
+```
+
+Now let's name the list elements using the course names:
+```{r name_list_elements}
+names(hashtag.list) <- rep(list.dirs(here("courses"), full.names = FALSE)[-1], c(sapply(list.dirs(here("courses"))[-1], function(x){
+    length(list.files(here(x)))})))
+```
+
+And let's create a vector of the unique course names for future use:
+```{r get_course_names}
+course.names <- list.dirs(here("courses"), full.names = FALSE)[-1]
+```
+
+Now we can tally unique hashtags by unique courses from within the list:
+```{r tally_course_hashtags}
+course.hashtag.tally <- list()
+for (i in 1:length(names(hashtag.list))){
+course.hashtag.tally[[i]] <- table(unlist(hashtag.list[!is.na(match(names(hashtag.list), names(hashtag.list)[i]))]))
+}
+# name list elements by course
+names(course.hashtag.tally) <- names(hashtag.list)
+```
+
+Now get rid of hashtags in names, leaving only grouping and key word:
+
+```{r rid_hashtags}
+for (i in 1:length(course.hashtag.tally)){
+  names(course.hashtag.tally[[i]]) <- sub('#', "", 
+            names(course.hashtag.tally[[i]]), fixed = T)
+}
+```
+
+Now we have a master list whose element names are the course numbers and the element contents are the keyword combinations and tallies.
+
+We need to create CSV files that are suitable for network construction.
+
+First create tibble that includes course names, category ("group") of observation (here, "concept", "skill", or "potential"), the keyword, and the number of times appearing "n".
+
+We'll start with a blank list, then add tibbles as elements.
+
+```{r blanklist}
+tag.list <- list()
+```
+
+
+```{r tally_hashtags1}
+for (i in 1:length(course.hashtag.tally)) {
+tag.list[[i]] <- tibble(
+  course = rep(names(course.hashtag.tally)[i], length(course.hashtag.tally[[i]])),
+  group = unlist(lapply(str_split(names(course.hashtag.tally[[i]]), "/"), function(x){x[1]})),
+  word = unlist(lapply(str_split(names(course.hashtag.tally[[i]]), "/"), function(x){x[2]})),
+  n = as.numeric(course.hashtag.tally[[i]])
+  )
+}
+```
+
+Now append all tibbles to make one big tibble
+
+```{r}
+tag.tibble <- tidyr::tibble(do.call(dplyr::bind_rows, tag.list))
+```
+
+## Create node and edge objects
+
+Now we need to wrangle the data into formats suitable for network construction with `visNetwork`, i.e. nodes and edges.  
+We can have course numbers serve as nodes, and we can also use the "words" (concepts) as nodes. The "n" values are the number of times the concept is mentioned in the course documents. The latter can serve as a weighting for edges, if desired.
+
+The concepts, skills, and courses are all going to be nodes, and they will be categorized by "groups" ("Skill", "Concept", "Course"), and for now we'll exclude the "potential" category.
+
+```{r subset_data}
+tag.tibble.subset <- filter(tag.tibble, group != "Potential")
+```
+
+Here is where we can include a "title" variable that holds clickable URL addresses for node links.
+
+We'll demo this for the "Data_visualization" and "Descriptive_statistics" skills for now.
+
+```{r set_nodes}
+nodes.concepts.skills <- tibble(
+  id = c(unique(tag.tibble.subset$word),unique(tag.tibble.subset$course)),
+  label = c(unique(tag.tibble.subset$word),unique(tag.tibble.subset$course))
+)
+nodes.concepts.skills$title <- NA
+# assign group categories
+nodes.concepts.skills$group <- unlist(sapply(nodes.concepts.skills$id, function(x){tag.tibble.subset[match(x, tag.tibble.subset$word),"group"]}))
+
+nodes.concepts.skills[is.na(nodes.concepts.skills$group), "group"] <- "Course"
+
+# assign URLs
+nodes.concepts.skills[nodes.concepts.skills$label == "Data_visualization", "title"] <- 
+  '<a target="_blank" href = "https://ubco-biology.github.io/BIOL202/vis-variable.html">Visit Tutorial</a>'
+nodes.concepts.skills[nodes.concepts.skills$label == "Descriptive_statistics", "title"] <- 
+  '<a target="_blank" href = "https://ubco-biology.github.io/BIOL202/vis-describe.html">Visit Tutorial</a>'
+```
+
+Write to CSV file
+```{r write_node_csv}
+write_csv(nodes.concepts.skills, here("output", "nodes_visnetwork.csv"))
+# make copy in scripts folder
+write_csv(nodes.concepts.skills, here("scripts", "nodes_visnetwork.csv"))
+```
+
+Now we need to make edge tibble We'll cycle through each row of the `nodes.concepts.skills` tibble, populating a row in an edge tibble
+
+```{r}
+edge.list <- list()
+```
+
+
+```{r create_edges}
+for (i in 1:nrow(tag.tibble.subset)){
+  edge.list[[i]] <- as_tibble(data.frame(from = tag.tibble.subset[i, "word"], 
+                           to = tag.tibble.subset[i, "course"], 
+                           weight = tag.tibble.subset[i, "n"],
+                           group = tag.tibble.subset[i, "group"]))
+}
+edges <- tidyr::tibble(do.call(dplyr::bind_rows, edge.list))
+names(edges) <- c("from", "to", "weight", "group")
+# not sure why weight / 8...
+edges$width <- 1+edges$weight/8
+
+```
+
+Write edge dataframe to CSV:
+
+```{r write_edge_csv}
+write_csv(edges, here("output", "edges_visnetwork.csv"))
+# make copy in scripts
+write_csv(edges, here("scripts", "edges_visnetwork.csv"))
+```
+
+## Visualize network
+
+### VisNetwork approach
+
+Using the `visNetwork` package.
+
+```{r test_vis}
+
+visNetwork(nodes.concepts.skills, edges) %>% 
+  # darkblue square with shadow for group "concept"
+  visGroups(groupname = "Concept", color = "#66C2A5", shape = "square", 
+            shadow = list(enabled = TRUE)) %>% 
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  # red triangle for group "skill"
+  visGroups(groupname = "Skill", color = "#8DA0CB", shape = "triangle") %>%
+  visGroups(groupname = "Course", color = "#FC8D62", shape = "circle") %>%
+  visLegend() %>%
+  visIgraphLayout(layout = "layout_nicely")
+```
+
+
+

@@ -1,0 +1,27 @@
+id,label,title,group
+Bias,Bias,NA,Concept
+Hypothesis,Hypothesis,NA,Concept
+Metadata,Metadata,NA,Concept
+Replication,Replication,NA,Concept
+Reproducibility,Reproducibility,NA,Concept
+Study_power,Study_power,NA,Concept
+Confidence_interval,Confidence_interval,NA,Skill
+Data_visualization,Data_visualization,"<a target=""_blank"" href = ""https://ubco-biology.github.io/BIOL202/vis-variable.html"">Visit Tutorial</a>",Skill
+Descriptive_statistics,Descriptive_statistics,"<a target=""_blank"" href = ""https://ubco-biology.github.io/BIOL202/vis-describe.html"">Visit Tutorial</a>",Skill
+Interpreting_results,Interpreting_results,NA,Skill
+Literature_review,Literature_review,NA,Skill
+RLanguage,RLanguage,NA,Skill
+Study_design,Study_design,NA,Skill
+Scientific_method,Scientific_method,NA,Concept
+Confirmatory_research,Confirmatory_research,NA,Skill
+ANOVA,ANOVA,NA,Skill
+Correlation,Correlation,NA,Skill
+Exploratory_research,Exploratory_research,NA,Skill
+Log_transformation,Log_transformation,NA,Skill
+Markdown,Markdown,NA,Skill
+Regression,Regression,NA,Skill
+Tidy_data,Tidy_data,NA,Skill
+tTest,tTest,NA,Skill
+BIOL116,BIOL116,NA,Course
+BIOL125,BIOL125,NA,Course
+BIOL202,BIOL202,NA,Course
