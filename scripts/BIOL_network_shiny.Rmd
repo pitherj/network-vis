@@ -207,7 +207,8 @@ edges <- tidyr::tibble(do.call(dplyr::bind_rows, edge.list))
 names(edges) <- c("from", "to", "weight", "group")
 # not sure why weight / 8...
 edges$width <- 1+edges$weight/8
-
+# treat columns one and two (to and from) as unique identifiers, so that tags are not repeated across courses.
+edges <- edges[!duplicated(edges[, 1:2]), ]
 ```
 
 Write edge dataframe to CSV:
