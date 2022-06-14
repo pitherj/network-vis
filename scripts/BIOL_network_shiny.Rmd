@@ -169,7 +169,7 @@ nodes.concepts.skills <- tibble(
   id = c(unique(tag.tibble.subset$word),unique(tag.tibble.subset$course)),
   label = c(unique(tag.tibble.subset$word),unique(tag.tibble.subset$course))
 )
-nodes.concepts.skills$title <- NA
+nodes.concepts.skills$title <- as.character(NA)
 # assign group categories
 nodes.concepts.skills$group <- unlist(sapply(nodes.concepts.skills$id, function(x){tag.tibble.subset[match(x, tag.tibble.subset$word),"group"]}))
 
